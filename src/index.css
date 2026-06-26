@@ -1,0 +1,103 @@
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Space+Grotesk:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-heading: "Space Grotesk", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  --color-primary: hsl(24, 100%, 50%);
+  --color-primary-light: hsl(30, 100%, 96%);
+  --color-navy: hsl(222, 47%, 11%);
+  /* Navy/Black for sidebar */
+  --color-success: hsl(152, 60%, 42%);
+  --color-info: hsl(210, 80%, 55%);
+  --color-danger: hsl(0, 84%, 60%);
+
+  --radius-xl: 12px;
+}
+
+@layer base {
+  body {
+    @apply font-body bg-white text-black antialiased;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading tracking-tight;
+  }
+}
+
+@layer components {
+  .glass-header {
+    @apply sticky top-0 z-40 bg-white/70 backdrop-blur-xl border-b border-gray-100;
+  }
+
+  .floating-island {
+    @apply m-4 rounded-[12px] shadow-2xl;
+  }
+
+  .premium-card {
+    @apply bg-white rounded-[12px] border border-gray-100 shadow-sm transition-all duration-300 hover:shadow-md;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-primary text-white rounded-[12px] font-medium transition-transform active:scale-95 hover:opacity-90;
+  }
+
+  /* Mobile stacked table layout (cards with labels) */
+  @media (max-width: 640px) {
+    .mobile-stack-table thead {
+      display: none;
+    }
+
+    .mobile-stack-table tbody {
+      display: block;
+    }
+
+    .mobile-stack-table tbody tr {
+      display: block;
+      margin: 12px 0;
+      padding: 14px 14px;
+      border: 1px solid rgb(243 244 246);
+      border-radius: 12px;
+      background: white;
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+    }
+
+    .mobile-stack-table tbody td {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 6px 0;
+      border: 0 !important;
+      width: 100%;
+    }
+
+    .mobile-stack-table tbody td::before {
+      content: attr(data-label);
+      flex: 0 0 auto;
+      max-width: 45%;
+      color: rgb(107 114 128);
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 10px;
+      line-height: 1.2;
+      padding-top: 2px;
+    }
+
+    .mobile-stack-table tbody td[data-no-label="true"]::before {
+      content: "";
+    }
+
+    .mobile-stack-table tbody td[data-actions="true"] {
+      justify-content: flex-start;
+      gap: 10px;
+      padding-top: 10px;
+    }
+
+    .mobile-stack-table tbody td[data-actions="true"]::before {
+      content: "Actions";
+    }
+  }
+}
