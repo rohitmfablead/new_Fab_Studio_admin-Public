@@ -1,28 +1,45 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Edit2, ListPlus, Plus, Trash2, X, Save } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
-import { showSuccess } from '@/src/lib/toast';
+import { showSuccess, showError } from '@/src/lib/toast';
+import { get, post } from '@/src/lib/api';
+import { Loader2 } from 'lucide-react';
 
-const featuresData = [
-  { id: 'photos', name: 'Photos', type: 'resource' },
-  { id: 'videos', name: 'Videos', type: 'resource' },
-  { id: 'storage', name: 'Storage', type: 'resource' },
-  { id: 'events', name: 'Events', type: 'resource' },
-  { id: 'custom_watermark', name: 'Custom Watermark', type: 'boolean' },
-  { id: 'face_recognition', name: 'Face Recognition', type: 'boolean' },
-  { id: 'business_branding', name: 'Business Branding', type: 'boolean' },
-  { id: 'view_client_favorites', name: 'View Client Favorites', type: 'boolean' },
-  { id: 'switch_downloads', name: 'Switch On/Off Downloads', type: 'boolean' },
-  { id: 'bulk_download', name: 'Bulk Download', type: 'boolean' },
-  { id: 'portfolio_website', name: 'Portfolio Website', type: 'boolean' },
-  { id: 'team_login', name: 'Team Login & Controls', type: 'boolean' },
-  { id: 'digital_album', name: 'Digital Album', type: 'boolean' },
-];
+// Features data will be fetched from API
 
 export function FeaturesPage() {
+  const [features, setFeatures] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingFeature, setEditingFeature] = useState<any>(null);
-  
+
+  const fetchFeatures = async () => {
+    try {
+      const response = await get('/admin/subscription-features');
+      if (response.success || response.status === 'success') {
+        const rawData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+        const resourceFeatures = ['Photos', 'Videos', 'Storage', 'Events'];
+        const mappedData = rawData.map((f: any) => ({
+          ...f,
+          name: f.feature_name,
+          type: resourceFeatures.includes(f.feature_name) ? 'resource' : 'boolean'
+        }));
+        setFeatures(mappedData);
+      } else {
+        showError(response.message || 'Failed to fetch features');
+      }
+    } catch (error) {
+      showError('An error occurred while fetching features');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchFeatures();
+  }, []);
+
   // State for the modal
   const [resourceTiers, setResourceTiers] = useState<{ quantity: string; price: string }[]>([]);
   const [booleanPrice, setBooleanPrice] = useState<string>('');
@@ -32,11 +49,20 @@ export function FeaturesPage() {
     setEditingFeature(feature);
     setErrors({});
     if (feature.type === 'resource') {
-      // Initialize with one tier or load from API/state
-      setResourceTiers([{ quantity: '100', price: '50' }]);
+      // Initialize with existing tiers from API if available
+      if (feature.addons && feature.addons.length > 0) {
+        setResourceTiers(
+          feature.addons.map((addon: any) => ({
+            quantity: addon.feature_value?.toString() || '',
+            price: addon.addon_price?.toString() || ''
+          }))
+        );
+      } else {
+        setResourceTiers([{ quantity: '100', price: '50' }]);
+      }
     } else {
       // Initialize with default price or load from API/state
-      setBooleanPrice('99');
+      setBooleanPrice(feature.value?.toString() || '99');
     }
   };
 
@@ -63,7 +89,7 @@ export function FeaturesPage() {
 
   const handleSave = () => {
     const newErrors: Record<string, string> = {};
-    
+
     if (editingFeature.type === 'resource') {
       if (resourceTiers.length === 1) {
         if (!resourceTiers[0].quantity || !resourceTiers[0].price) {
@@ -75,7 +101,7 @@ export function FeaturesPage() {
           const tier = resourceTiers[i];
           const hasQty = !!tier.quantity;
           const hasPrice = !!tier.price;
-          
+
           if (hasQty && hasPrice) {
             hasValidRow = true;
           } else if (hasQty !== hasPrice) {
@@ -97,9 +123,40 @@ export function FeaturesPage() {
       return;
     }
 
-    // In a real app, dispatch an action to save the pricing configuration here.
-    showSuccess(`${editingFeature.name} pricing updated successfully!`);
-    closeEditModal();
+    const saveChanges = async () => {
+      setSaving(true);
+      try {
+        const payload: any = {
+          subscription_feature_id: editingFeature.id,
+          type: editingFeature.name
+        };
+
+        if (editingFeature.type === 'resource') {
+          payload[editingFeature.name] = resourceTiers.map(t => ({
+            qty: Number(t.quantity),
+            price: Number(t.price)
+          }));
+        } else {
+          payload.price = Number(booleanPrice);
+        }
+
+        const response = await post('/admin/subscription-features/update-addon', payload);
+
+        if (response.success || (response as any).status === 'success') {
+          showSuccess(`${editingFeature.name} pricing updated successfully!`);
+          fetchFeatures(); // Refresh the list
+          closeEditModal();
+        } else {
+          showError(response.message || 'Failed to update feature pricing');
+        }
+      } catch (error) {
+        showError('An error occurred while saving.');
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    saveChanges();
   };
 
   return (
@@ -117,7 +174,7 @@ export function FeaturesPage() {
         <div className="flex items-center gap-3">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary rounded-xl border border-primary/20">
             <ListPlus className="w-5 h-5" />
-            <span className="text-xs font-black uppercase tracking-widest">{featuresData.length} Features</span>
+            <span className="text-xs font-black uppercase tracking-widest">{features.length} Features</span>
           </div>
         </div>
       </div>
@@ -130,16 +187,29 @@ export function FeaturesPage() {
               <tr className="border-b border-gray-100 bg-gray-50/50">
                 <th className="py-5 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest w-16 text-center">No</th>
                 <th className="py-5 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest">Feature Name</th>
-                
+
                 <th className="py-5 px-6 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
-              {featuresData.map((feature, idx) => (
+              {loading ? (
+                <tr>
+                  <td colSpan={3} className="py-12 text-center">
+                    <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto" />
+                    <p className="text-sm font-medium text-gray-400 mt-2">Loading features...</p>
+                  </td>
+                </tr>
+              ) : features.length === 0 ? (
+                <tr>
+                  <td colSpan={3} className="py-12 text-center">
+                    <p className="text-sm font-medium text-gray-400">No features found.</p>
+                  </td>
+                </tr>
+              ) : features.map((feature, idx) => (
                 <tr key={feature.id} className="hover:bg-gray-50/50 transition-colors group">
                   <td className="py-4 px-6 text-sm font-bold text-gray-400 text-center">{(idx + 1).toString().padStart(2, '0')}</td>
                   <td className="py-4 px-6 text-sm font-black text-navy">{feature.name}</td>
-                  
+
                   <td className="py-4 px-6 text-right">
                     <button
                       onClick={() => openEditModal(feature)}
@@ -202,7 +272,7 @@ export function FeaturesPage() {
                         Add Tier
                       </button>
                     </div>
-                    
+
                     {errors['global'] && (
                       <div className="p-3 bg-danger/10 text-danger text-xs font-bold rounded-xl mb-4">
                         {errors['global']}
@@ -212,36 +282,36 @@ export function FeaturesPage() {
                       {resourceTiers.map((tier, idx) => (
                         <div key={idx} className="flex flex-col gap-2">
                           <div className={`flex gap-3 items-end bg-gray-50 p-4 rounded-2xl border ${errors[`tier-${idx}`] ? 'border-danger' : 'border-gray-100'}`}>
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Quantity {resourceTiers.length === 1 ? '*' : ''}</label>
-                            <input
-                              type="number"
-                              value={tier.quantity}
-                              onChange={(e) => handleTierChange(idx, 'quantity', e.target.value)}
-                              placeholder="e.g. 100"
-                              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
-                            />
-                          </div>
-                          <div className="flex-1 space-y-1.5">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Price (₹) {resourceTiers.length === 1 ? '*' : ''}</label>
-                            <input
-                              type="number"
-                              value={tier.price}
-                              onChange={(e) => handleTierChange(idx, 'price', e.target.value)}
-                              placeholder="e.g. 50"
-                              className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
-                            />
-                          </div>
-                          {resourceTiers.length > 1 && (
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveTier(idx)}
-                              className="h-[42px] px-3 bg-danger/10 text-danger rounded-xl hover:bg-danger/20 transition-all flex items-center justify-center shrink-0"
-                              title="Remove Tier"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          )}
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Quantity {resourceTiers.length === 1 ? '*' : ''}</label>
+                              <input
+                                type="number"
+                                value={tier.quantity}
+                                onChange={(e) => handleTierChange(idx, 'quantity', e.target.value)}
+                                placeholder="e.g. 100"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
+                              />
+                            </div>
+                            <div className="flex-1 space-y-1.5">
+                              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Price (₹) {resourceTiers.length === 1 ? '*' : ''}</label>
+                              <input
+                                type="number"
+                                value={tier.price}
+                                onChange={(e) => handleTierChange(idx, 'price', e.target.value)}
+                                placeholder="e.g. 50"
+                                className="w-full px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
+                              />
+                            </div>
+                            {resourceTiers.length > 1 && (
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveTier(idx)}
+                                className="h-[42px] px-3 bg-danger/10 text-danger rounded-xl hover:bg-danger/20 transition-all flex items-center justify-center shrink-0"
+                                title="Remove Tier"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            )}
                           </div>
                           {errors[`tier-${idx}`] && (
                             <p className="text-danger text-xs font-bold px-2">{errors[`tier-${idx}`]}</p>
@@ -281,10 +351,15 @@ export function FeaturesPage() {
                 </button>
                 <button
                   onClick={handleSave}
-                  className="flex-1 py-3 bg-navy text-white rounded-xl font-black uppercase tracking-widest text-xs hover:shadow-xl hover:shadow-navy/20 transition-all flex items-center justify-center gap-2 group"
+                  disabled={saving}
+                  className="flex-1 py-3 bg-navy text-white rounded-xl font-black uppercase tracking-widest text-xs hover:shadow-xl hover:shadow-navy/20 transition-all flex items-center justify-center gap-2 group disabled:opacity-70"
                 >
-                  <Save className="w-4 h-4 group-hover:rotate-12 transition-transform" />
-                  Save Changes
+                  {saving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Save className="w-4 h-4 group-hover:rotate-12 transition-transform" />
+                  )}
+                  {saving ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </motion.div>

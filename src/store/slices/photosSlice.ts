@@ -186,7 +186,7 @@ export const uploadPhotos = createAsyncThunk(
       
       // Use fetch for file upload with progress tracking
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'https://fablead-studio.com/services/api'}/groups/${groupId}/photos/upload`,
+        `${import.meta.env.VITE_API_BASE_URL || 'https://stag.fablead-studio.com/services/api'}/groups/${groupId}/photos/upload`,
         {
           method: 'POST',
           headers: {
@@ -294,7 +294,7 @@ export const bulkDownloadPhotos = createAsyncThunk(
       
       // Make request to download endpoint
       const response = await fetch(
-        `${import.meta.env.VITE_API_BASE_URL || 'https://fablead-studio.com/services/api'}/photos/download`,
+        `${import.meta.env.VITE_API_BASE_URL || 'https://stag.fablead-studio.com/services/api'}/photos/download`,
         {
           method: 'POST',
           headers: {

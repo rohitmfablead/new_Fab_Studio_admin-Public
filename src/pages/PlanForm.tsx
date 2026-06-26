@@ -5,9 +5,10 @@ import { createPlan, updatePlan } from '@/src/store/slices/planSlice';
 import { showSuccess, showError } from '@/src/lib/toast';
 import { Check, Save, Plus, Trash2, X, ArrowLeft, ChevronDown } from 'lucide-react';
 import { cn } from '@/src/lib/utils';
+import { get } from '@/src/lib/api';
 import { motion } from 'motion/react';
 
-const CustomSelect = ({ value, onChange, options, placeholder }: { value: string, onChange: (v: string) => void, options: {value: string, label: string}[], placeholder: string }) => {
+const CustomSelect = ({ value, onChange, options, placeholder }: { value: string, onChange: (v: string) => void, options: { value: string, label: string }[], placeholder: string }) => {
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -25,8 +26,8 @@ const CustomSelect = ({ value, onChange, options, placeholder }: { value: string
 
   return (
     <div className="relative" ref={dropdownRef}>
-      <button 
-        type="button" 
+      <button
+        type="button"
         onClick={() => setIsOpen(!isOpen)}
         className="w-full px-5 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy focus:outline-none focus:border-primary/40 transition-all flex items-center justify-between"
       >
@@ -39,14 +40,14 @@ const CustomSelect = ({ value, onChange, options, placeholder }: { value: string
         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-xl shadow-2xl z-50 overflow-hidden">
           <div className="max-h-60 overflow-y-auto">
             {options.map(opt => (
-               <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => { onChange(opt.value); setIsOpen(false); }}
-                  className={`w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors ${String(value) === String(opt.value) ? 'bg-primary/5 text-primary font-black' : 'text-navy font-bold'}`}
-               >
-                  {opt.label}
-               </button>
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => { onChange(opt.value); setIsOpen(false); }}
+                className={`w-full text-left px-5 py-3 hover:bg-gray-50 transition-colors ${String(value) === String(opt.value) ? 'bg-primary/5 text-primary font-black' : 'text-navy font-bold'}`}
+              >
+                {opt.label}
+              </button>
             ))}
           </div>
         </div>
@@ -61,8 +62,63 @@ export function PlanForm() {
   const dispatch = useAppDispatch();
   const { plans } = useAppSelector((state) => state.plans);
 
+  const [apiFeatures, setApiFeatures] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchFeatures = async () => {
+      try {
+        const response: any = await get('admin/subscription-features');
+        if (response.success || response.status === 'success') {
+          const rawData = Array.isArray(response.data) ? response.data : response.data?.data || [];
+          setApiFeatures(rawData);
+        }
+      } catch (error) {
+        console.error('Failed to fetch features', error);
+      }
+    };
+    fetchFeatures();
+  }, []);
+
+  const getOptionsFor = (featureName: string, suffix = '') => {
+    const feature = apiFeatures.find((f: any) => f.feature_name === featureName);
+    const opts: { value: string, label: string }[] = [];
+    if (feature && feature.addons) {
+      feature.addons.forEach((a: any) => {
+        if (a.feature_value !== null && a.feature_value !== undefined && a.feature_value !== '') {
+          opts.push({
+            value: a.feature_value.toString(),
+            label: `${a.feature_value}${suffix ? ' ' + suffix : ''}`
+          });
+        }
+      });
+    }
+    if (opts.length === 0) {
+      if (featureName === 'Photos') return [{ value: '100', label: '100' }, { value: '500', label: '500' }, { value: '1000', label: '1000' }, { value: '0', label: 'Unlimited' }];
+      if (featureName === 'Videos') return [{ value: '10', label: '10' }, { value: '50', label: '50' }, { value: '100', label: '100' }, { value: '0', label: 'Unlimited' }];
+      if (featureName === 'Storage') return [{ value: '10', label: '10 GB' }, { value: '50', label: '50 GB' }, { value: '100', label: '100 GB' }, { value: '500', label: '500 GB' }, { value: '0', label: 'Unlimited' }];
+      if (featureName === 'Events') return [{ value: '1', label: '1' }, { value: '5', label: '5' }, { value: '10', label: '10' }, { value: '0', label: 'Unlimited' }];
+    }
+
+    if (!opts.find(o => o.value === '0')) {
+      opts.push({ value: '0', label: 'Unlimited' });
+    }
+    return opts;
+  };
+
+  const featureKeyMapping: Record<string, keyof typeof planForm> = {
+    'Custom Watermark': 'has_custom_watermark',
+    'Face Recognition': 'has_face_recognition',
+    'Business Branding': 'has_business_branding',
+    'View Client Favorites': 'has_view_client_favorites',
+    'Switch Downloads': 'has_switch_downloads',
+    'Bulk Download': 'has_bulk_download',
+    'Portfolio Website': 'has_portfolio_website',
+    'Team Login': 'has_team_login',
+    'Digital Flipbook': 'has_digital_album',
+  };
+
   const isEditing = id !== 'new' && id !== undefined;
-  
+
   const editingPlan = isEditing ? plans?.find(p => p.id.toString() === id) : null;
 
   const [planForm, setPlanForm] = useState({
@@ -166,7 +222,7 @@ export function PlanForm() {
     newAddOns[category][index][field] = value;
     setAddOns(newAddOns);
   };
-  
+
 
 
   const [isSaving, setIsSaving] = useState(false);
@@ -197,7 +253,7 @@ export function PlanForm() {
         has_digital_album: planForm.has_digital_album,
         is_active: planForm.is_active,
         features: planForm.features.filter(f => f.trim() !== '')
-      
+
       };
 
       if (isEditing && editingPlan) {
@@ -225,7 +281,7 @@ export function PlanForm() {
     <div className="space-y-12">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-start gap-4">
-          <button 
+          <button
             onClick={() => navigate('/admin/subscription')}
             className="p-2 mt-1 bg-white border border-gray-100 hover:bg-gray-50 rounded-xl transition-colors text-gray-400 hover:text-navy group shadow-sm"
           >
@@ -303,34 +359,34 @@ export function PlanForm() {
           </div>
 
           <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Price *</label>
-              <div className="relative">
-                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-navy pointer-events-none">
-                  {planForm.currency}
-                </div>
-                <input
-                  type="number"
-                  required
-                  value={planForm.price}
-                  onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })}
-                  placeholder="2499"
-                  className="w-full pl-14 pr-5 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
-                />
-                <select
-                  value={planForm.currency}
-                  onChange={(e) => setPlanForm({ ...planForm, currency: e.target.value })}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-white border border-gray-200 rounded-lg text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all cursor-pointer"
-                >
-                  <option value="₹">₹ INR</option>
-                  <option value="$">$ USD</option>
-                  <option value="€">€ EUR</option>
-                </select>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Price *</label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-2xl font-black text-navy pointer-events-none">
+                {planForm.currency}
               </div>
+              <input
+                type="number"
+                required
+                value={planForm.price}
+                onChange={(e) => setPlanForm({ ...planForm, price: e.target.value })}
+                placeholder="2499"
+                className="w-full pl-14 pr-5 py-3 bg-gray-50 border border-gray-200 rounded-xl font-bold text-navy focus:outline-none focus:border-primary/40 transition-all"
+              />
+              <select
+                value={planForm.currency}
+                onChange={(e) => setPlanForm({ ...planForm, currency: e.target.value })}
+                className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 bg-white border border-gray-200 rounded-lg text-sm font-bold text-navy focus:outline-none focus:border-primary/40 transition-all cursor-pointer"
+              >
+                <option value="₹">₹ INR</option>
+                <option value="$">$ USD</option>
+                <option value="€">€ EUR</option>
+              </select>
             </div>
+          </div>
 
-          
 
-                    <div className="space-y-2">
+
+          <div className="space-y-2">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Description *</label>
             <textarea
               required
@@ -344,72 +400,51 @@ export function PlanForm() {
 
           <div className="space-y-3 pt-6 border-t border-gray-100">
             <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 block mb-3">Plan Limits</label>
-            
+
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Photos *</label>
-                <CustomSelect 
-                  value={String(planForm.max_photos)} 
+                <CustomSelect
+                  value={String(planForm.max_photos)}
                   onChange={(v) => setPlanForm({ ...planForm, max_photos: v })}
                   placeholder="Select Photos Limit"
-                  options={[
-                    { value: '100', label: '100' },
-                    { value: '500', label: '500' },
-                    { value: '1000', label: '1000' },
-                    { value: '0', label: 'Unlimited' }
-                  ]}
+                  options={getOptionsFor('Photos')}
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Videos *</label>
-                <CustomSelect 
-                  value={String(planForm.max_videos)} 
+                <CustomSelect
+                  value={String(planForm.max_videos)}
                   onChange={(v) => setPlanForm({ ...planForm, max_videos: v })}
                   placeholder="Select Videos Limit"
-                  options={[
-                    { value: '10', label: '10' },
-                    { value: '50', label: '50' },
-                    { value: '100', label: '100' },
-                    { value: '0', label: 'Unlimited' }
-                  ]}
+                  options={getOptionsFor('Videos')}
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Storage (GB) *</label>
-                <CustomSelect 
-                  value={String(planForm.max_storage_gb)} 
+                <CustomSelect
+                  value={String(planForm.max_storage_gb)}
                   onChange={(v) => setPlanForm({ ...planForm, max_storage_gb: v })}
                   placeholder="Select Storage"
-                  options={[
-                    { value: '10', label: '10 GB' },
-                    { value: '50', label: '50 GB' },
-                    { value: '100', label: '100 GB' },
-                    { value: '500', label: '500 GB' },
-                    { value: '0', label: 'Unlimited' }
-                  ]}
+                  options={getOptionsFor('Storage', 'GB')}
                 />
               </div>
 
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Events *</label>
-                <CustomSelect 
-                  value={String(planForm.max_events)} 
+                <CustomSelect
+                  value={String(planForm.max_events)}
                   onChange={(v) => setPlanForm({ ...planForm, max_events: v })}
                   placeholder="Select Events Limit"
-                  options={[
-                    { value: '1', label: '1' },
-                    { value: '5', label: '5' },
-                    { value: '10', label: '10' },
-                    { value: '0', label: 'Unlimited' }
-                  ]}
+                  options={getOptionsFor('Events')}
                 />
               </div>
             </div>
           </div>
 
-{/* 
+          {/* 
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Features (Optional)</label>
@@ -454,106 +489,32 @@ export function PlanForm() {
           */}
 
           <div className="grid grid-cols-2 gap-4">
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_custom_watermark"
-                  checked={planForm.has_custom_watermark}
-                  onChange={(e) => setPlanForm({ ...planForm, has_custom_watermark: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_custom_watermark" className="text-sm font-bold text-navy cursor-pointer">Custom Watermark</label>
-              </div>
-            )}
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <input
-                type="checkbox"
-                id="has_face_recognition"
-                checked={planForm.has_face_recognition}
-                onChange={(e) => setPlanForm({ ...planForm, has_face_recognition: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="has_face_recognition" className="text-sm font-bold text-navy cursor-pointer">Face Recognition</label>
-            </div>
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_business_branding"
-                  checked={planForm.has_business_branding}
-                  onChange={(e) => setPlanForm({ ...planForm, has_business_branding: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_business_branding" className="text-sm font-bold text-navy cursor-pointer">Business Branding</label>
-              </div>
-            )}
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_view_client_favorites"
-                  checked={planForm.has_view_client_favorites}
-                  onChange={(e) => setPlanForm({ ...planForm, has_view_client_favorites: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_view_client_favorites" className="text-sm font-bold text-navy cursor-pointer">View Client Favorites</label>
-              </div>
-            )}
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <input
-                type="checkbox"
-                id="has_switch_downloads"
-                checked={planForm.has_switch_downloads}
-                onChange={(e) => setPlanForm({ ...planForm, has_switch_downloads: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="has_switch_downloads" className="text-sm font-bold text-navy cursor-pointer">Switch On/Off Downloads</label>
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-              <input
-                type="checkbox"
-                id="has_bulk_download"
-                checked={planForm.has_bulk_download}
-                onChange={(e) => setPlanForm({ ...planForm, has_bulk_download: e.target.checked })}
-                className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-              />
-              <label htmlFor="has_bulk_download" className="text-sm font-bold text-navy cursor-pointer">Bulk Download</label>
-            </div>
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_portfolio_website"
-                  checked={planForm.has_portfolio_website}
-                  onChange={(e) => setPlanForm({ ...planForm, has_portfolio_website: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_portfolio_website" className="text-sm font-bold text-navy cursor-pointer">Portfolio Website</label>
-              </div>
-            )}
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_team_login"
-                  checked={planForm.has_team_login}
-                  onChange={(e) => setPlanForm({ ...planForm, has_team_login: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_team_login" className="text-sm font-bold text-navy cursor-pointer">Team Login & Controls</label>
-              </div>
-            )}
-            {planForm.role === 'photographer' && (
-              <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
-                <input
-                  type="checkbox"
-                  id="has_digital_album"
-                  checked={planForm.has_digital_album}
-                  onChange={(e) => setPlanForm({ ...planForm, has_digital_album: e.target.checked })}
-                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
-                />
-                <label htmlFor="has_digital_album" className="text-sm font-bold text-navy cursor-pointer">Digital Album</label>
+            {apiFeatures.length > 0 ? (
+              apiFeatures
+                .filter((f: any) => !['Photos', 'Videos', 'Storage', 'Events'].includes(f.feature_name))
+                .map((feature: any) => {
+                  const stateKey = featureKeyMapping[feature.feature_name];
+                  if (!stateKey) return null;
+
+                  const photographerOnly = ['has_custom_watermark', 'has_business_branding', 'has_view_client_favorites', 'has_portfolio_website', 'has_team_login', 'has_digital_album'].includes(stateKey);
+                  if (photographerOnly && planForm.role !== 'photographer') return null;
+
+                  return (
+                    <div key={feature.id} className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-100">
+                      <input
+                        type="checkbox"
+                        id={stateKey}
+                        checked={!!(planForm as any)[stateKey]}
+                        onChange={(e) => setPlanForm({ ...planForm, [stateKey]: e.target.checked })}
+                        className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                      />
+                      <label htmlFor={stateKey} className="text-sm font-bold text-navy cursor-pointer">{feature.feature_name}</label>
+                    </div>
+                  );
+                })
+            ) : (
+              <div className="col-span-2 text-center text-gray-400 py-4 text-sm font-bold">
+                Loading features...
               </div>
             )}
           </div>
@@ -587,10 +548,10 @@ export function PlanForm() {
               </button>
             </div>
           </div>
-        
-          
 
-</div>
+
+
+        </div>
 
         <div className="p-8 border-t border-gray-100 bg-gray-50/50 flex gap-4">
           <button

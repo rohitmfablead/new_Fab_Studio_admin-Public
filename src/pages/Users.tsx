@@ -887,7 +887,7 @@ export function UsersPage() {
                                   src={
                                     user.avatar.startsWith("http")
                                       ? user.avatar
-                                      : `${import.meta.env.VITE_API_BASE_URL || "https://fablead-studio.com/services/api"}/${user.avatar}`
+                                      : `${import.meta.env.VITE_API_BASE_URL || "https://stag.fablead-studio.com/services/api"}/${user.avatar}`
                                   }
                                   alt={user.name || user.email}
                                   className="w-full h-full object-cover"
