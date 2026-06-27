@@ -12,6 +12,7 @@ import billingReducer from './slices/billingSlice';
 import notificationsReducer from './slices/notificationsSlice';
 import enquiriesReducer from './slices/enquiriesSlice';
 import photosReducer from './slices/photosSlice';
+import transactionsReducer from './slices/transactionsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -28,6 +29,7 @@ export const store = configureStore({
     notifications: notificationsReducer,
     enquiries: enquiriesReducer,
     photos: photosReducer,
+    transactions: transactionsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

@@ -27,6 +27,7 @@ import { SupportPage } from './pages/Support';
 import { GroupDetails } from './pages/GroupDetails';
 import { PlanForm } from './pages/PlanForm';
 import { FeaturesPage } from './pages/Features';
+import { TransactionsPage } from './pages/Transactions';
 import { ProtectedRoute } from './components/ProtectedRoute';
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
               <Route path="notifications" element={<Notifications />} />
               <Route path="enquiry" element={<EnquiryPage />} />
               <Route path="support" element={<SupportPage />} />
+              <Route path="transactions" element={<TransactionsPage />} />
             </Route>
           </Route>
         </Routes>

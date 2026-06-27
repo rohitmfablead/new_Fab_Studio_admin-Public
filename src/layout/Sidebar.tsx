@@ -10,7 +10,8 @@ import { NavLink, useNavigate } from 'react-router-dom';
   MessageSquare,
   LogOut,
   LifeBuoy,
-  ListPlus
+  ListPlus,
+  Receipt,
 } from 'lucide-react';
 import fabLeadLogo from '/public/assets/fablead_logo.svg';
 import { cn } from '@/src/lib/utils';
@@ -27,6 +28,7 @@ const navItems = [
   { icon: MessageSquare, label: 'Inquiries', path: '/admin/enquiry' },
   { icon: LifeBuoy, label: 'Support Ticket', path: '/admin/support' },
   { icon: CreditCard, label: 'Subscription', path: '/admin/subscription' },
+  { icon: Receipt, label: 'Transactions', path: '/admin/transactions' },
   { icon: ListPlus, label: 'Features', path: '/admin/features' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
