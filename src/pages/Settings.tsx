@@ -251,16 +251,32 @@ export function SettingsPage() {
     setGeneralForm((prev) => ({ ...prev, maintenance_mode: nextValue }));
 
     try {
-      await dispatch(
-        updateSystemSettings({
-          general: { maintenance_mode: nextValue },
-        }),
-      ).unwrap();
-      showSuccess(
-        nextValue === "1"
-          ? "Maintenance mode enabled (site offline)"
-          : "Maintenance mode disabled (site live)",
+      const response = await fetch(
+        `${import.meta.env.VITE_API_BASE_URL || "https://api.fabphotopic.com"}/admin/is-live/toggle`,
+        {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+          },
+          body: JSON.stringify({
+            is_live: nextValue === "0" // true if going live, false if maintenance mode
+          }),
+        }
       );
+
+      const result = await response.json();
+
+      if (result.success) {
+        // API returns is_live: false when maintenance mode is ON
+        const newMaintenanceMode = result.is_live ? "0" : "1";
+        setGeneralForm((prev) => ({ ...prev, maintenance_mode: newMaintenanceMode }));
+        showSuccess(result.message || "Maintenance mode updated");
+      } else {
+        setGeneralForm((prev) => ({ ...prev, maintenance_mode: previousValue }));
+        showError(result.message || "Failed to update maintenance mode");
+      }
     } catch (error: any) {
       setGeneralForm((prev) => ({ ...prev, maintenance_mode: previousValue }));
       showError(error?.message || "Failed to update maintenance mode");
@@ -1014,7 +1030,7 @@ export function SettingsPage() {
                           Global environment variables and localized settings.
                         </p>
                       </div>
-                      <div
+                      {/* <div
                         className={cn(
                           "flex items-center gap-3 px-4 py-2 border rounded-2xl transition-all",
                           generalForm.maintenance_mode === "1"
@@ -1074,7 +1090,7 @@ export function SettingsPage() {
                             ? "Disable"
                             : "Enable"}
                         </button>
-                      </div>
+                      </div> */}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-8">

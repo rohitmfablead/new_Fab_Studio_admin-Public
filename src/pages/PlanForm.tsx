@@ -93,15 +93,12 @@ export function PlanForm() {
       });
     }
     if (opts.length === 0) {
-      if (featureName === 'Photos') return [{ value: '100', label: '100' }, { value: '500', label: '500' }, { value: '1000', label: '1000' }, { value: '0', label: 'Unlimited' }];
-      if (featureName === 'Videos') return [{ value: '10', label: '10' }, { value: '50', label: '50' }, { value: '100', label: '100' }, { value: '0', label: 'Unlimited' }];
-      if (featureName === 'Storage') return [{ value: '10', label: '10 GB' }, { value: '50', label: '50 GB' }, { value: '100', label: '100 GB' }, { value: '500', label: '500 GB' }, { value: '0', label: 'Unlimited' }];
-      if (featureName === 'Events') return [{ value: '1', label: '1' }, { value: '5', label: '5' }, { value: '10', label: '10' }, { value: '0', label: 'Unlimited' }];
+      if (featureName === 'Photos') return [{ value: '100', label: '100' }, { value: '500', label: '500' }, { value: '1000', label: '1000' }];
+      if (featureName === 'Videos') return [{ value: '10', label: '10' }, { value: '50', label: '50' }, { value: '100', label: '100' }];
+      if (featureName === 'Storage') return [{ value: '10', label: '10 GB' }, { value: '50', label: '50 GB' }, { value: '100', label: '100 GB' }, { value: '500', label: '500 GB' }];
+      if (featureName === 'Events') return [{ value: '1', label: '1' }, { value: '5', label: '5' }, { value: '10', label: '10' }];
     }
 
-    if (!opts.find(o => o.value === '0')) {
-      opts.push({ value: '0', label: 'Unlimited' });
-    }
     return opts;
   };
 

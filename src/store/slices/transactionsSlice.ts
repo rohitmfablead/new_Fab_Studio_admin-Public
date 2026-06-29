@@ -16,6 +16,7 @@ export interface Transaction {
   razorpay_payment_id: string | null;
   razorpay_signature: string | null;
   amount: string;          // comes as string from API e.g. "2298.00"
+  total_amount: string;    // the actual charged amount
   currency: string;
   status: string;          // 'pending' | 'successful' | 'failed'
   receipt: string | null;

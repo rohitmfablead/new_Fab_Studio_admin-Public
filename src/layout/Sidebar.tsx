@@ -1,6 +1,6 @@
 import React from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
- import {
+import {
   LayoutDashboard,
   Users,
   Settings,
@@ -28,8 +28,8 @@ const navItems = [
   { icon: MessageSquare, label: 'Inquiries', path: '/admin/enquiry' },
   { icon: LifeBuoy, label: 'Support Ticket', path: '/admin/support' },
   { icon: CreditCard, label: 'Subscription', path: '/admin/subscription' },
-  { icon: Receipt, label: 'Transactions', path: '/admin/transactions' },
   { icon: ListPlus, label: 'Features', path: '/admin/features' },
+  { icon: Receipt, label: 'Transactions', path: '/admin/transactions' },
   { icon: Settings, label: 'Settings', path: '/admin/settings' },
 ];
 
@@ -104,7 +104,7 @@ export function Sidebar({ mobile = false, onClose }: { mobile?: boolean; onClose
 
         {/* Footer */}
         <div className="p-6 border-t border-white/5 relative z-10">
-         
+
           <button
             onClick={handleLogout}
             className="w-full bg-white/5 hover:bg-white/10 text-white rounded-[12px] p-4 flex items-center justify-center gap-3 transition-colors group"
@@ -112,7 +112,7 @@ export function Sidebar({ mobile = false, onClose }: { mobile?: boolean; onClose
             <LogOut className="w-5 h-5 text-white/60 group-hover:text-white transition-colors" />
             <span className="font-medium text-sm tracking-wide">Logout</span>
           </button>
-         </div>
+        </div>
       </div>
     </aside>
   );

@@ -111,7 +111,69 @@ function CopyButton({ value }: { value: string }) {
 const STATUS_FILTERS = ['all', 'successful', 'pending', 'failed'];
 const PAGE_SIZES = [10, 25, 50];
 
-// ─── Component ────────────────────────────────────────────────────────────────
+// ─── Components ──────────────────────────────────────────────────────────────
+
+const ItemsModal = ({ txn, onClose }: { txn: Transaction | null; onClose: () => void }) => {
+  if (!txn) return null;
+
+  const featureMap = new Map();
+  txn.features?.forEach(f => {
+    featureMap.set(f.id, { ...f, matchedAddons: [] });
+  });
+  txn.addons_id?.forEach(a => {
+    if (featureMap.has(a.subscription_feature_id)) {
+      featureMap.get(a.subscription_feature_id).matchedAddons.push(a);
+    } else {
+      featureMap.set(`unknown-${a.id}`, { feature_name: 'Addon', matchedAddons: [a] });
+    }
+  });
+  const items = Array.from(featureMap.values());
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-navy/20 backdrop-blur-sm" onClick={onClose}>
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 10 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.95, y: 10 }}
+        className="bg-white rounded-3xl shadow-2xl p-6 w-full max-w-md max-h-[85vh] overflow-y-auto custom-scrollbar"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h3 className="text-lg font-black text-navy uppercase tracking-tight">Purchased Items</h3>
+            <p className="text-xs text-gray-400 font-medium mt-1">Order: {txn.razorpay_order_id || 'N/A'}</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-gray-100 rounded-xl transition-colors">
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
+        
+        {items.length === 0 ? (
+          <p className="text-sm text-gray-400 text-center py-8">No items found.</p>
+        ) : (
+          <div className="flex flex-col gap-3">
+            {items.map(f => (
+              <div key={f.id || f.feature_name} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 bg-gray-50 border border-gray-100 rounded-xl">
+                <span className="text-xs font-bold text-gray-600 uppercase tracking-wider">{f.feature_name}</span>
+                {f.matchedAddons.length > 0 && (
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {f.matchedAddons.map((a: any, i: number) => (
+                      <span key={i} className="text-[11px] font-black text-navy bg-white px-2.5 py-1 rounded-md shadow-sm border border-gray-100">
+                        {a.feature_value ?? `₹${a.addon_price}`}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    </div>
+  );
+};
+
+// ─── Main Page ────────────────────────────────────────────────────────────────
 
 export function TransactionsPage() {
   const dispatch = useAppDispatch();
@@ -128,6 +190,7 @@ export function TransactionsPage() {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedItemsTxn, setSelectedItemsTxn] = useState<Transaction | null>(null);
 
   // Fetch on mount
   const loadTransactions = useCallback(() => {
@@ -206,7 +269,7 @@ export function TransactionsPage() {
     const all: Transaction[] = transactions ?? [];
     const totalAmount = all
       .filter((t) => t.status?.toLowerCase() === 'successful')
-      .reduce((sum, t) => sum + parseFloat(t.amount), 0);
+      .reduce((sum, t) => sum + parseFloat(t.total_amount || t.amount), 0);
     return {
       total: all.length,
       successful: all.filter((t) => t.status?.toLowerCase() === 'successful').length,
@@ -215,6 +278,25 @@ export function TransactionsPage() {
       totalRevenue: totalAmount,
     };
   }, [transactions]);
+
+  // ── Helpers ────────────────────────────────────────────────────
+  const renderTransactionItems = (txn: Transaction) => {
+    if (!txn.features?.length && !txn.addons_id?.length) {
+      return <span className="text-xs text-gray-300">—</span>;
+    }
+
+    return (
+      <button 
+        onClick={(e) => { e.stopPropagation(); setSelectedItemsTxn(txn); }}
+        className="inline-flex items-center gap-2 px-3 py-1.5 bg-primary/5 hover:bg-primary/10 text-primary rounded-xl border border-primary/10 transition-colors"
+      >
+        <span className="text-[10px] font-black uppercase tracking-widest">View Items</span>
+        <span className="text-[10px] font-bold bg-white text-navy px-1.5 rounded shadow-sm border border-gray-100">
+          {txn.features?.length || 0}
+        </span>
+      </button>
+    );
+  };
 
   // ── Render ─────────────────────────────────────────────────────
   return (
@@ -383,21 +465,17 @@ export function TransactionsPage() {
                             <p className="text-xs text-gray-400 font-medium truncate mt-0.5">
                               {txn.user?.email ?? '—'}
                             </p>
-                            {/* Features */}
-                            <p className="text-xs text-gray-400 font-medium mt-1 truncate">
-                              {txn.features?.map(f => f.feature_name).join(', ') || '—'}
-                            </p>
-                            {/* Addons */}
-                            <p className="text-xs text-gray-400 font-medium mt-1 truncate">
-                              {txn.addons_id?.map(a => a.feature_value ?? a.addon_price).join(', ') || '—'}
-                            </p>
-                            <p className="text-[10px] text-gray-300 font-mono mt-1 truncate">
+                            {/* Purchased Items */}
+                            <div className="mt-2">
+                              {renderTransactionItems(txn)}
+                            </div>
+                            <p className="text-[10px] text-gray-300 font-mono mt-2 truncate">
                               {truncateId(txn.razorpay_order_id, 22)}
                             </p>
                           </div>
                           <div className="text-right shrink-0">
                             <p className="text-base font-black text-navy">
-                              {formatAmount(txn.amount, txn.currency)}
+                              {formatAmount(txn.total_amount || txn.amount, txn.currency)}
                             </p>
                             <div className={cn(
                               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl border mt-1',
@@ -429,15 +507,14 @@ export function TransactionsPage() {
                 <thead>
                   <tr className="bg-[#fcfcfc] border-b border-gray-100">
                     {([
-                      { key: 'id',                   label: '#' },
-                      { key: 'user_id',              label: 'User' },
-                      { key: 'razorpay_order_id',    label: 'Order ID' },
-                      { key: 'razorpay_payment_id',  label: 'Payment ID' },
-                      { key: 'amount',               label: 'Amount' },
-                      { key: 'features',            label: 'Features' },
-                      { key: 'addons_id',           label: 'Addons' },
-                      { key: 'status',               label: 'Status' },
-                      { key: 'created_at',           label: 'Date' }
+                      { key: 'id', label: '#' },
+                      { key: 'user_id', label: 'User' },
+                      { key: 'razorpay_order_id', label: 'Order ID' },
+                      { key: 'razorpay_payment_id', label: 'Payment ID' },
+                      { key: 'amount', label: 'Amount' },
+                      { key: 'features', label: 'Purchased Items' },
+                      { key: 'status', label: 'Status' },
+                      { key: 'created_at', label: 'Date' }
                     ] as { key: keyof Transaction; label: string }[]).map((col) => (
                       <th
                         key={col.key}
@@ -510,17 +587,16 @@ export function TransactionsPage() {
                               )}
                             </td>
 
-                            {/* Features */}
+                            {/* Amount */}
                             <td className="px-6 py-5">
-                              <div className="text-xs text-gray-600">
-                                {txn.features?.map(f => f.feature_name).join(', ') || '—'}
-                              </div>
+                              <p className="text-sm font-black text-navy">
+                                {formatAmount(txn.total_amount || txn.amount, txn.currency)}
+                              </p>
                             </td>
-                            {/* Addons */}
+
+                            {/* Purchased Items */}
                             <td className="px-6 py-5">
-                              <div className="text-xs text-gray-600">
-                                {txn.addons_id?.map(a => a.feature_value ?? a.addon_price).join(', ') || '—'}
-                              </div>
+                              {renderTransactionItems(txn)}
                             </td>
 
                             {/* Status */}
@@ -612,6 +688,15 @@ export function TransactionsPage() {
           </div>
         )}
       </div>
+
+      <AnimatePresence>
+        {selectedItemsTxn && (
+          <ItemsModal 
+            txn={selectedItemsTxn} 
+            onClose={() => setSelectedItemsTxn(null)} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
