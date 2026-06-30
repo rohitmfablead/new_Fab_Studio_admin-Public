@@ -176,6 +176,7 @@ export function UsersPage() {
   } = useAppSelector((state) => state.plans);
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("All Status");
   const [roleFilter, setRoleFilter] = useState("All Roles");
   const [dateFilter, setDateFilter] = useState("All Time");
@@ -203,10 +204,19 @@ export function UsersPage() {
   const startItem = totalUsers === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endItem = Math.min(currentPage * pageSize, totalUsers);
 
+  // Debounce search term to prevent excessive API calls
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1); // Reset page on new search
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   // Fetch users whenever page, pageSize, search, or filters change
   React.useEffect(() => {
     const params: Record<string, any> = { page: currentPage, limit: pageSize };
-    if (searchTerm.trim()) params.search = searchTerm.trim();
+    if (debouncedSearchTerm.trim()) params.search = debouncedSearchTerm.trim();
     if (statusFilter !== "All Status") params.status = statusFilter;
     if (roleFilter !== "All Roles") params.role = roleFilter;
     if (sortConfig) {
@@ -218,7 +228,7 @@ export function UsersPage() {
     dispatch,
     currentPage,
     pageSize,
-    searchTerm,
+    debouncedSearchTerm,
     statusFilter,
     roleFilter,
     sortConfig,
@@ -527,11 +537,8 @@ export function UsersPage() {
               type="text"
               placeholder="Search identities by name, email, or phone..."
               value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-12 pr-4 py-3 md:py-3.5 bg-white border border-gray-200 rounded-[16px] text-xs md:text-sm font-bold text-navy focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all shadow-sm"
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-12 pr-4 py-3 md:py-3.5 bg-white border border-gray-200 rounded-[16px] text-xs md:text-sm font-bold text-navy focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all shadow-sm placeholder:font-normal placeholder:text-gray-400"
             />
           </div>
           <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3 overflow-hidden">
@@ -806,7 +813,7 @@ export function UsersPage() {
         </div>
 
         {/* Users Table (stacks into labeled cards on mobile) */}
-        <div className="overflow-x-auto no-scrollbar min-h-[400px]">
+        <div className="hidden sm:block overflow-x-auto no-scrollbar min-h-[400px]">
           <table className="w-full text-left border-collapse mobile-stack-table">
             <thead>
               <tr className="bg-gray-50/50">

@@ -1,5 +1,5 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
-import { get, put, post, PaginationData } from '../../lib/api';
+import { get, put, post, del, PaginationData } from '../../lib/api';
 
 // Types
 export interface Notification {
@@ -23,6 +23,10 @@ export interface Notification {
     type: string;
     extra?: any;
   };
+  read?: boolean;
+  title?: string;
+  message?: string;
+  timestamp?: string;
 }
 
 export interface SendNotificationData {
@@ -36,6 +40,7 @@ export interface SendNotificationData {
 export interface FetchNotificationsParams {
   page?: number;
   per_page?: number;
+  silent?: boolean;
 }
 
 // State
@@ -178,6 +183,22 @@ export const sendNotification = createAsyncThunk(
   }
 );
 
+export const deleteNotification = createAsyncThunk(
+  'notifications/deleteNotification',
+  async (notificationId: string, { rejectWithValue }) => {
+    try {
+      const response = await del(`/admin/notifications/${notificationId}`);
+      if (response.success) {
+        return notificationId;
+      } else {
+        throw new Error(response.error?.message || 'Failed to delete notification');
+      }
+    } catch (error: any) {
+      return rejectWithValue(error.message || 'Failed to delete notification');
+    }
+  }
+);
+
 // Slice
 const notificationsSlice = createSlice({
   name: 'notifications',
@@ -218,8 +239,10 @@ const notificationsSlice = createSlice({
   extraReducers: (builder) => {
     // Fetch Notifications
     builder
-      .addCase(fetchNotifications.pending, (state) => {
-        state.isLoading = true;
+      .addCase(fetchNotifications.pending, (state, action) => {
+        if (!action.meta.arg.silent) {
+          state.isLoading = true;
+        }
         state.error = null;
       })
       .addCase(fetchNotifications.fulfilled, (state, action) => {
@@ -287,6 +310,24 @@ const notificationsSlice = createSlice({
       })
       .addCase(sendNotification.rejected, (state, action) => {
         state.isSending = false;
+        state.error = action.payload as string;
+      })
+      // Delete Notification
+      .addCase(deleteNotification.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(deleteNotification.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const deletedId = action.payload;
+        const index = state.notifications.findIndex(n => n.id === deletedId);
+        if (index !== -1 && !state.notifications[index].read) {
+          state.unreadCount = Math.max(0, state.unreadCount - 1);
+        }
+        state.notifications = state.notifications.filter(n => n.id !== deletedId);
+      })
+      .addCase(deleteNotification.rejected, (state, action) => {
+        state.isLoading = false;
         state.error = action.payload as string;
       });
   },

@@ -1386,7 +1386,7 @@ export function GroupsPage() {
           </div>
         </div>
 
-        {filteredAndSortedGroups.length === 0 && !isLoading && !error && (
+        {filteredAndSortedGroups.length === 0 && viewMode === "list" && !isLoading && !error && (
           <div className="py-32 flex flex-col items-center justify-center text-center">
             <div className="w-24 h-24 bg-gray-50 rounded-[40px] flex items-center justify-center mb-6 border border-gray-100">
               <Users2 className="w-10 h-10 text-gray-200" />
@@ -1482,22 +1482,22 @@ export function GroupsPage() {
               initial={{ scale: 0.95, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="relative w-full max-w-sm md:max-w-md bg-white rounded-[32px] md:rounded-[40px] overflow-hidden shadow-2xl p-8 md:p-12 text-center"
+              className="relative w-full max-w-xs md:max-w-sm bg-white rounded-2xl md:rounded-3xl overflow-hidden shadow-2xl p-6 md:p-8 text-center"
             >
-              <div className="w-20 h-20 md:w-24 md:h-24 bg-danger/10 text-danger rounded-[24px] md:rounded-[32px] flex items-center justify-center mx-auto mb-6 md:mb-8">
-                <AlertCircle className="w-10 h-10 md:w-12 md:h-12" />
+              <div className="w-12 h-12 md:w-16 md:h-16 bg-danger/10 text-danger rounded-xl md:rounded-2xl flex items-center justify-center mx-auto mb-4 md:mb-5">
+                <AlertCircle className="w-6 h-6 md:w-8 md:h-8" />
               </div>
-              <h3 className="text-2xl md:text-3xl font-black text-navy tracking-tight mb-3">
-                Confirm Dalete
+              <h3 className="text-xl md:text-2xl font-black text-navy tracking-tight mb-2">
+                Confirm Delete
               </h3>
-              <p className="text-xs md:text-base text-gray-500 font-medium leading-relaxed mb-8 md:mb-10 px-2">
-                Are you certain you wish to permanently decommission{" "}
+              <p className="text-xs md:text-sm text-gray-500 font-medium leading-relaxed mb-6">
+                Are you sure you want to permanently delete{" "}
                 <span className="text-navy font-black">
                   {selectedGroups.length}
                 </span>{" "}
-                group(s)? All repositories and participant logic will be wiped.
+                group(s)? All associated photos, videos, and members will be removed.
               </p>
-              <div className="flex flex-col gap-3">
+              <div className="flex flex-col gap-2">
                 <button
                   onClick={async () => {
                     try {
@@ -1532,14 +1532,14 @@ export function GroupsPage() {
                       showError(error || "Failed to delete groups");
                     }
                   }}
-                  className="w-full py-4 bg-danger text-white rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-danger/30 hover:scale-[1.02] active:scale-95 transition-all group flex items-center justify-center gap-2"
+                  className="w-full py-3 bg-danger text-white rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs shadow-lg shadow-danger/20 hover:scale-[1.02] active:scale-95 transition-all group flex items-center justify-center gap-2"
                 >
-                  <Trash2 className="w-4 h-4 group-hover:scale-110 transition-transform" />
-                  <span>Confirm Decommission</span>
+                  <Trash2 className="w-3.5 h-3.5 md:w-4 md:h-4 group-hover:scale-110 transition-transform" />
+                  <span>Confirm Delete</span>
                 </button>
                 <button
                   onClick={() => setIsDeleteModalOpen(false)}
-                  className="w-full py-3 md:py-5 text-gray-400 font-bold text-xs md:text-sm hover:text-navy transition-all"
+                  className="w-full py-2.5 md:py-3 text-gray-400 font-bold text-[10px] md:text-xs hover:text-navy transition-all"
                 >
                   Cancel
                 </button>

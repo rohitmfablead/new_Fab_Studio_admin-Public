@@ -5,6 +5,7 @@ import { cn } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 import { useAppDispatch, useAppSelector } from '@/src/store/hooks';
 import { logout } from '@/src/store/slices/authSlice';
+import { fetchNotifications } from '@/src/store/slices/notificationsSlice';
 import { showSuccess, showError } from '@/src/lib/toast';
 
 export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
@@ -12,6 +13,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const { settings } = useAppSelector((state) => state.settings);
+  const { unreadCount } = useAppSelector((state) => state.notifications);
   const pathnames = location.pathname.split('/').filter((x) => x);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isChangePwOpen, setIsChangePwOpen] = useState(false);
@@ -29,6 +31,15 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const [pwError, setPwError] = useState('');
   const [pwSuccess, setPwSuccess] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Poll for new notifications every 10 seconds
+    const intervalId = setInterval(() => {
+      dispatch(fetchNotifications({ page: 1, per_page: 20, silent: true }));
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [dispatch]);
 
   const handleLogout = async () => {
     try {
@@ -168,7 +179,11 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
             className="relative p-2 hover:bg-gray-100 rounded-lg transition-colors group"
           >
             <Bell className="w-5 h-5 text-gray-500 group-hover:text-primary" />
-            <span className="absolute top-2 right-2 w-2 h-2 bg-primary rounded-full border-2 border-white" />
+            {unreadCount > 0 && (
+              <span className="absolute top-0 right-0 w-4 h-4 bg-primary text-white text-[9px] font-bold rounded-full border-2 border-white flex items-center justify-center -mt-1 -mr-1">
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </span>
+            )}
           </button>
           
           <div className="h-8 w-[1px] bg-gray-200" />
@@ -183,9 +198,13 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               )}
             >
               <div className="relative">
-                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center text-white font-bold text-xs ring-2 ring-white shadow-sm">
-                  {initials}
-                </div>
+                {settings?.profile?.avatar ? (
+                  <img src={settings.profile.avatar} className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm" alt="Avatar" />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center text-white font-bold text-xs ring-2 ring-white shadow-sm">
+                    {initials}
+                  </div>
+                )}
                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-success rounded-full border-2 border-white" />
               </div>
               <div className="hidden sm:block text-left px-1">
@@ -209,9 +228,13 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-primary/20 blur-[40px] rounded-full" />
                     <div className="relative z-10 flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md flex items-center justify-center p-0.5">
-                        <div className="w-full h-full rounded-xl bg-primary flex items-center justify-center text-white text-xl font-black">
-                          {initials}
-                        </div>
+                        {settings?.profile?.avatar ? (
+                          <img src={settings.profile.avatar} className="w-full h-full rounded-xl object-cover" alt="Avatar" />
+                        ) : (
+                          <div className="w-full h-full rounded-xl bg-primary flex items-center justify-center text-white text-xl font-black">
+                            {initials}
+                          </div>
+                        )}
                       </div>
                       <div>
                         <div className="flex items-center gap-2">

@@ -49,7 +49,7 @@ export function SettingsPage() {
   const { settings, isLoading, error, isUpdating } = useAppSelector(
     (state) => state.settings,
   );
-  console.log("settings", settings);
+
   const [activeTab, setActiveTab] = useState("profile");
 
   // Form states
@@ -61,6 +61,11 @@ export function SettingsPage() {
     executive_region: "",
     bio: "",
   });
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [profileErrors, setProfileErrors] = useState<Record<string, string>>({});
 
   const [generalForm, setGeneralForm] = useState({
     platform_name: "",
@@ -96,7 +101,7 @@ export function SettingsPage() {
     mail_encryption: "tls",
     admin_email: "",
   });
-  console.log("sdsdssdsdssds", smtpForm);
+
   const [notificationPrefs, setNotificationPrefs] = useState({
     email_notifications: true,
     push_notifications: true,
@@ -218,16 +223,82 @@ export function SettingsPage() {
     }
   }, [settings]);
 
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        showError("File size must be less than 5MB");
+        return;
+      }
+      setAvatarFile(file);
+      setImageError(false); // Reset error state on new upload
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAvatarPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveProfile = async () => {
+    const errors: Record<string, string> = {};
+    if (!profileForm.first_name.trim()) errors.first_name = "First name is required";
+    if (!profileForm.last_name.trim()) errors.last_name = "Last name is required";
+    if (!profileForm.professional_title.trim()) errors.professional_title = "Title is required";
+    if (!profileForm.executive_region.trim()) errors.executive_region = "Region is required";
+    if (!profileForm.bio.trim()) errors.bio = "Bio is required";
+
+    if (Object.keys(errors).length > 0) {
+      setProfileErrors(errors);
+      showError("Please fill in all required fields");
+      return;
+    }
+
+    setProfileErrors({});
+    setIsSavingProfile(true);
     try {
-      await dispatch(
-        updateSystemSettings({
-          profile: profileForm,
-        }),
-      ).unwrap();
-      showSuccess("Profile updated successfully!");
+      if (avatarFile) {
+        const formData = new FormData();
+        formData.append("first_name", profileForm.first_name);
+        formData.append("last_name", profileForm.last_name);
+        formData.append("email", profileForm.email);
+        formData.append("professional_title", profileForm.professional_title);
+        formData.append("executive_region", profileForm.executive_region);
+        formData.append("bio", profileForm.bio);
+        formData.append("avatar", avatarFile);
+        formData.append("_method", "PUT");
+
+        const response = await fetch(
+          `${import.meta.env.VITE_API_BASE_URL || "https://api.fabphotopic.com"}/admin/settings/profile`,
+          {
+            method: "post",
+            headers: {
+              Authorization: `Bearer ${localStorage.getItem("auth_token")}`,
+            },
+            body: formData,
+          },
+        );
+        const result = await response.json();
+        if (result.success) {
+          showSuccess("Profile updated successfully!");
+          dispatch(fetchSystemSettings());
+          setAvatarFile(null);
+          setAvatarPreview(null);
+        } else {
+          showError(result.message || "Failed to update profile");
+        }
+      } else {
+        await dispatch(
+          updateSystemSettings({
+            profile: profileForm,
+          }),
+        ).unwrap();
+        showSuccess("Profile updated successfully!");
+      }
     } catch (error: any) {
       showError(error?.message || "Failed to update profile");
+    } finally {
+      setIsSavingProfile(false);
     }
   };
 
@@ -672,16 +743,35 @@ export function SettingsPage() {
 
                         <div className="flex items-center gap-6 relative z-10">
                           <div className="relative">
-                            <div className="w-20 h-20 rounded-2xl bg-white p-1 shadow-xl overflow-hidden">
-                              <img
-                                src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&h=400&fit=crop"
-                                className="w-full h-full object-cover rounded-xl"
-                                alt="Executive Avatar"
-                              />
+                            <div className="w-20 h-20 rounded-2xl bg-white p-1 shadow-xl overflow-hidden flex items-center justify-center">
+                              {(!imageError && (avatarPreview || settings?.profile?.avatar)) ? (
+                                <img
+                                  src={avatarPreview || settings?.profile?.avatar}
+                                  className="w-full h-full object-cover rounded-xl"
+                                  alt="Executive Avatar"
+                                  onError={() => setImageError(true)}
+                                />
+                              ) : (
+                                <div className="w-full h-full rounded-xl bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center text-white font-bold text-2xl">
+                                  {`${(profileForm.first_name || 'A').charAt(0)}${(profileForm.last_name || 'A').charAt(0)}`.toUpperCase()}
+                                </div>
+                              )}
                             </div>
-                            <button className="absolute -bottom-1.5 -right-1.5 p-2 bg-primary text-white rounded-lg shadow-lg border-2 border-navy hover:scale-110 transition-transform">
+                            <label 
+                              className={cn(
+                                "absolute -bottom-1.5 -right-1.5 p-2 bg-primary text-white rounded-lg shadow-lg border-2 border-navy transition-transform cursor-pointer z-20",
+                                (isSavingProfile || isUpdating) ? "opacity-50 cursor-not-allowed" : "hover:scale-110"
+                              )}
+                            >
                               <Camera className="w-3 h-3" />
-                            </button>
+                              <input
+                                type="file"
+                                accept="image/jpeg, image/png, image/webp"
+                                className="hidden"
+                                onChange={handleAvatarChange}
+                                disabled={isSavingProfile || isUpdating}
+                              />
+                            </label>
                           </div>
                           <div>
                             <h3 className="text-4xl font-black text-white tracking-tight">
@@ -701,7 +791,7 @@ export function SettingsPage() {
                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                               First Name
                             </label>
-                            <div className="flex items-center gap-3 border-b border-gray-100 py-3 group-focus-within:border-primary transition-colors">
+                            <div className="flex items-center gap-3 border-b border-gray-100 py-3 focus-within:border-primary transition-colors">
                               <User className="w-4 h-4 text-gray-300" />
                               <input
                                 type="text"
@@ -716,12 +806,15 @@ export function SettingsPage() {
                                 className="w-full bg-transparent border-none text-sm font-bold text-navy focus:outline-none disabled:opacity-50"
                               />
                             </div>
+                            {profileErrors.first_name && (
+                              <p className="text-xs text-danger font-medium mt-1">{profileErrors.first_name}</p>
+                            )}
                           </div>
                           <div className="space-y-2">
                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                               Last Name
                             </label>
-                            <div className="flex items-center gap-3 border-b border-gray-100 py-3 group-focus-within:border-primary transition-colors">
+                            <div className="flex items-center gap-3 border-b border-gray-100 py-3 focus-within:border-primary transition-colors">
                               <User className="w-4 h-4 text-gray-300" />
                               <input
                                 type="text"
@@ -736,6 +829,9 @@ export function SettingsPage() {
                                 className="w-full bg-transparent border-none text-sm font-bold text-navy focus:outline-none disabled:opacity-50"
                               />
                             </div>
+                            {profileErrors.last_name && (
+                              <p className="text-xs text-danger font-medium mt-1">{profileErrors.last_name}</p>
+                            )}
                           </div>
                         </div>
 
@@ -763,7 +859,7 @@ export function SettingsPage() {
                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                               Professional Title
                             </label>
-                            <div className="flex items-center gap-3 border-b border-gray-100 py-2 group-focus-within:border-primary transition-colors">
+                            <div className="flex items-center gap-3 border-b border-gray-100 py-2 focus-within:border-primary transition-colors">
                               <ShieldAlert className="w-4 h-4 text-gray-300" />
                               <input
                                 type="text"
@@ -778,12 +874,15 @@ export function SettingsPage() {
                                 className="w-full bg-transparent border-none text-sm font-bold text-navy focus:outline-none disabled:opacity-50"
                               />
                             </div>
+                            {profileErrors.professional_title && (
+                              <p className="text-xs text-danger font-medium mt-1">{profileErrors.professional_title}</p>
+                            )}
                           </div>
                           <div className="space-y-1">
                             <label className="text-[10px] font-black uppercase tracking-widest text-gray-400">
                               Executive Region
                             </label>
-                            <div className="flex items-center gap-3 border-b border-gray-100 py-2 group-focus-within:border-primary transition-colors">
+                            <div className="flex items-center gap-3 border-b border-gray-100 py-2 focus-within:border-primary transition-colors">
                               <Globe className="w-4 h-4 text-gray-300" />
                               <input
                                 type="text"
@@ -798,6 +897,9 @@ export function SettingsPage() {
                                 className="w-full bg-transparent border-none text-sm font-bold text-navy focus:outline-none disabled:opacity-50"
                               />
                             </div>
+                            {profileErrors.executive_region && (
+                              <p className="text-xs text-danger font-medium mt-1">{profileErrors.executive_region}</p>
+                            )}
                           </div>
                         </div>
 
@@ -816,16 +918,19 @@ export function SettingsPage() {
                             disabled={isUpdating}
                             className="w-full p-6 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium text-gray-600 min-h-[140px] focus:outline-none focus:border-primary/40 focus:bg-white transition-all resize-none leading-relaxed disabled:opacity-50"
                           />
+                          {profileErrors.bio && (
+                            <p className="text-xs text-danger font-medium mt-1">{profileErrors.bio}</p>
+                          )}
                         </div>
 
                         {/* Save Button at bottom */}
                         <div className="pt-4 border-t border-gray-100 flex justify-end">
                           <button
                             onClick={handleSaveProfile}
-                            disabled={isUpdating}
+                            disabled={isUpdating || isSavingProfile}
                             className="btn-primary px-10 py-4 shadow-xl shadow-primary/20 flex items-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            {isUpdating ? (
+                            {isUpdating || isSavingProfile ? (
                               <>
                                 <Loader2 className="w-5 h-5 animate-spin" />
                                 <span className="font-black uppercase tracking-widest text-sm">

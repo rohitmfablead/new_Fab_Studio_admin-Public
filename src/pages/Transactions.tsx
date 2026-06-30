@@ -194,7 +194,7 @@ export function TransactionsPage() {
 
   // Fetch on mount
   const loadTransactions = useCallback(() => {
-    dispatch(fetchTransactions());
+    dispatch(fetchTransactions({}));
   }, [dispatch]);
 
   useEffect(() => {

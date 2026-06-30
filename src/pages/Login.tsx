@@ -31,6 +31,71 @@ export function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
 
+  // Rate limiting state
+  const [lockoutTime, setLockoutTime] = useState<number | null>(null);
+  const [remainingTime, setRemainingTime] = useState<number>(0);
+  const [failedAttempts, setFailedAttempts] = useState<number>(0);
+
+  // Initialize rate limit state from localStorage
+  useEffect(() => {
+    const email = formData.email?.toLowerCase().trim();
+    if (!email) {
+      setLockoutTime(null);
+      setFailedAttempts(0);
+      return;
+    }
+
+    const storedLockout = localStorage.getItem(`admin_login_lockout_${email}`);
+    const storedAttempts = localStorage.getItem(`admin_login_attempts_${email}`);
+    
+    setFailedAttempts(parseInt(storedAttempts || '0', 10));
+
+    if (storedLockout) {
+      const lockoutTimestamp = parseInt(storedLockout, 10);
+      if (Date.now() < lockoutTimestamp) {
+        setLockoutTime(lockoutTimestamp);
+      } else {
+        localStorage.removeItem(`admin_login_lockout_${email}`);
+        localStorage.removeItem(`admin_login_attempts_${email}`);
+        setLockoutTime(null);
+        setFailedAttempts(0);
+      }
+    } else {
+      setLockoutTime(null);
+    }
+  }, [formData.email]);
+
+  // Update remaining time timer
+  useEffect(() => {
+    if (!lockoutTime) return;
+
+    const email = formData.email?.toLowerCase().trim();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      if (now >= lockoutTime) {
+        setLockoutTime(null);
+        setRemainingTime(0);
+        if (email) {
+          localStorage.removeItem(`admin_login_lockout_${email}`);
+          localStorage.removeItem(`admin_login_attempts_${email}`);
+        }
+        clearInterval(interval);
+      } else {
+        setRemainingTime(Math.ceil((lockoutTime - now) / 1000));
+      }
+    }, 1000);
+
+    // Immediate first tick update
+    const initialRemaining = Math.ceil((lockoutTime - Date.now()) / 1000);
+    if (initialRemaining > 0) {
+      setRemainingTime(initialRemaining);
+    } else {
+      setLockoutTime(null);
+    }
+
+    return () => clearInterval(interval);
+  }, [lockoutTime, formData.email]);
+
   // Redirect if already authenticated
   useEffect(() => {
     if (isAuthenticated) {
@@ -80,6 +145,10 @@ export function LoginPage() {
       return;
     }
 
+    if (lockoutTime) {
+      return; // Prevent submission if locked out
+    }
+
     console.log('Form data being submitted:', formData);
 
     try {
@@ -99,12 +168,38 @@ export function LoginPage() {
         } else {
           localStorage.removeItem('remember_email');
         }
+        
+        // Reset rate limiting
+        const email = formData.email?.toLowerCase().trim();
+        if (email) {
+          localStorage.removeItem(`admin_login_attempts_${email}`);
+          localStorage.removeItem(`admin_login_lockout_${email}`);
+        }
+        
         navigate('/admin/dashboard');
       } else {
         console.log('Login failed:', result);
+        handleFailedAttempt();
       }
     } catch (err) {
       console.log('Login submission error:', err);
+      handleFailedAttempt();
+    }
+  };
+
+  const handleFailedAttempt = () => {
+    const email = formData.email?.toLowerCase().trim();
+    if (!email) return;
+
+    const currentAttempts = parseInt(localStorage.getItem(`admin_login_attempts_${email}`) || '0', 10);
+    const newAttempts = currentAttempts + 1;
+    localStorage.setItem(`admin_login_attempts_${email}`, newAttempts.toString());
+    setFailedAttempts(newAttempts);
+
+    if (newAttempts >= 5) {
+      const lockoutEnd = Date.now() + 5 * 60 * 1000; // 5 minutes
+      localStorage.setItem(`admin_login_lockout_${email}`, lockoutEnd.toString());
+      setLockoutTime(lockoutEnd);
     }
   };
 
@@ -146,18 +241,28 @@ export function LoginPage() {
         </div>
 
         {/* General Error Display */}
-        {(error || formErrors.general) && (
+        {lockoutTime ? (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
-            className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-start gap-3"
+            className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/50 flex items-start gap-3"
           >
-            <AlertCircle className="w-5 h-5 text-red-400 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-400 text-sm font-medium">
-                {formErrors.general || error}
-              </p>
-            </div>
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-500 font-medium">
+              Too many failed login attempts. Please try again in {Math.floor(remainingTime / 60)}m {remainingTime % 60}s.
+            </p>
+          </motion.div>
+        ) : (error || formErrors.general) && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/50 flex items-start gap-3"
+          >
+            <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
+            <p className="text-sm text-red-500 font-medium">
+              {error || formErrors.general}
+              {failedAttempts > 0 && failedAttempts < 5 && ` (${5 - failedAttempts} attempt${5 - failedAttempts === 1 ? '' : 's'} remaining)`}
+            </p>
           </motion.div>
         )}
 
@@ -216,20 +321,22 @@ export function LoginPage() {
 
           <button
             type="submit"
-            disabled={isLoading}
-            className="w-full py-5 bg-primary text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-2xl shadow-primary/20 hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            disabled={isLoading || !!lockoutTime}
+            className="w-full bg-primary hover:bg-primary/90 text-white py-4 rounded-xl font-medium transition-all duration-300 relative overflow-hidden group disabled:opacity-70 disabled:cursor-not-allowed"
           >
-            {isLoading ? (
-              <>
-                <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                <span>Signing in...</span>
-              </>
-            ) : (
-              <>
-                <span>Login</span>
-                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
+            <div className="absolute inset-0 bg-white/20 translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out" />
+            <span className="relative flex items-center justify-center gap-2">
+              {isLoading ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : lockoutTime ? (
+                <span>Locked Out</span>
+              ) : (
+                <>
+                  <span>Login</span>
+                  <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </span>
           </button>
         </form>
       </motion.div>

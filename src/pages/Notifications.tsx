@@ -3,7 +3,7 @@ import { Bell, Check, Trash2, AlertCircle, Zap, Send, ChevronLeft, ChevronRight,
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '@/src/lib/utils';
 import { useAppDispatch, useAppSelector } from '@/src/store/hooks';
-import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, sendNotification, SendNotificationData } from '../store/slices/notificationsSlice';
+import { fetchNotifications, markNotificationAsRead, markAllNotificationsAsRead, sendNotification, SendNotificationData, deleteNotification, type Notification } from '../store/slices/notificationsSlice';
 import { fetchUsers } from '../store/slices/usersSlice';
 import { showSuccess, showError } from '../lib/toast';
 
@@ -12,12 +12,15 @@ export function Notifications() {
   const { notifications, isLoading, error, isSending, pagination } = useAppSelector((state) => state.notifications);
   const { users } = useAppSelector((state) => state.users);
   const [currentPage, setCurrentPage] = useState(1);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [showBroadcastModal, setShowBroadcastModal] = useState(false);
   const [selectedNotification, setSelectedNotification] = useState<Notification | null>(null);
   const [sendToAll, setSendToAll] = useState(true);
   const [selectedUserIds, setSelectedUserIds] = useState<number[]>([]);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [notificationToDelete, setNotificationToDelete] = useState<Notification | null>(null);
 
   const [broadcastForm, setBroadcastForm] = useState({
     title: '',
@@ -90,6 +93,41 @@ export function Notifications() {
     }
   };
 
+  const confirmDelete = (notification: Notification) => {
+    setNotificationToDelete(notification);
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteNotification = async () => {
+    if (notificationToDelete) {
+      try {
+        await dispatch(deleteNotification(notificationToDelete.id)).unwrap();
+        showSuccess('Notification deleted successfully');
+        setShowDeleteModal(false);
+        setNotificationToDelete(null);
+      } catch (error: any) {
+        showError(error || 'Failed to delete notification');
+      }
+    }
+  };
+
+  // Debounce search term for smooth filtering
+  React.useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const filteredNotifications = notifications.filter(n => {
+    const matchesSearch = n.title.toLowerCase().includes(debouncedSearchTerm.toLowerCase()) ||
+      n.message.toLowerCase().includes(debouncedSearchTerm.toLowerCase());
+    const matchesStatus = statusFilter === 'All Status' ||
+      (statusFilter === 'Read' && n.read) ||
+      (statusFilter === 'Unread' && !n.read);
+    return matchesSearch && matchesStatus;
+  });
+
   return (
     <div className="space-y-10">
       {/* Header Section */}
@@ -99,10 +137,10 @@ export function Notifications() {
             <div className="p-3 bg-navy text-white rounded-[20px] shadow-lg shadow-navy/20">
               <Bell className="w-6 h-6" />
             </div>
-            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-navy tracking-tight uppercase italic">Resource Alerts</h1>
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-navy tracking-tight uppercase italic">Notifications</h1>
           </div>
           <p className="text-sm md:text-base text-gray-500 font-medium pl-1">
-            Centralized monitoring for <span className="text-primary font-black">System Protocols</span> and security intelligence.
+            Manage your <span className="text-primary font-black">System Notifications</span> and alerts.
           </p>
         </div>
 
@@ -118,7 +156,7 @@ export function Notifications() {
             className="flex-1 lg:flex-none px-4 md:px-6 py-2.5 md:py-3 bg-navy text-white rounded-[20px] text-[9px] md:text-[10px] font-black uppercase tracking-[0.15em] md:tracking-[0.2em] transition-all active:scale-95 shadow-xl shadow-navy/20 flex items-center justify-center gap-2 md:gap-3 whitespace-nowrap"
           >
             <Send className="w-3.5 h-3.5 md:w-4 md:h-4" />
-            <span className="hidden sm:inline">Initialize Broadcast</span>
+            <span className="hidden sm:inline">Broadcast</span>
             <span className="sm:hidden">Broadcast</span>
           </button>
         </div>
@@ -127,15 +165,15 @@ export function Notifications() {
       <div className="bg-white rounded-[32px] border border-gray-100 shadow-xl shadow-navy/5 overflow-hidden">
         {/* Search & Filter Bar */}
         <div className="p-4 md:p-6 border-b border-gray-50 bg-gray-50/30">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-gray-400" />
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="relative w-full xl:w-96">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 type="text"
-                placeholder="Search alerts by title or content..."
+                placeholder="Search notifications..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 md:pl-11 pr-3 md:pr-4 py-2 md:py-2.5 bg-white border border-gray-100 rounded-[16px] text-[11px] md:text-xs font-bold text-navy focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all shadow-sm placeholder:text-gray-300"
+                className="w-full pl-12 pr-4 py-3 md:py-3.5 bg-white border border-gray-200 rounded-[16px] text-xs md:text-sm font-bold text-navy focus:outline-none focus:border-primary/40 focus:ring-4 focus:ring-primary/5 transition-all shadow-sm placeholder:font-normal placeholder:text-gray-400"
               />
             </div>
 
@@ -150,8 +188,8 @@ export function Notifications() {
                 style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 24 24\' stroke=\'%23001F3F\'%3E%3Cpath stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'2\' d=\'M19 9l-7 7-7-7\'/%3E%3C/svg%3E")', backgroundRepeat: 'no-repeat', backgroundPosition: 'right 12px center', backgroundSize: '12px' }}
               >
                 <option>All Status</option>
-                <option>Pending Sync</option>
-                <option>Acknowledged</option>
+                <option>Unread</option>
+                <option>Read</option>
               </select>
             </div>
           </div>
@@ -167,9 +205,9 @@ export function Notifications() {
             <div className="w-20 h-20 md:w-24 md:h-24 bg-gray-50 rounded-[24px] md:rounded-[32px] flex items-center justify-center mb-4 md:mb-6">
               <Bell className="w-8 h-8 md:w-10 md:h-10 text-gray-200" />
             </div>
-            <h3 className="text-lg md:text-xl font-black text-navy uppercase tracking-tight mb-2">Protocol Feed Silent</h3>
+            <h3 className="text-lg md:text-xl font-black text-navy uppercase tracking-tight mb-2">No Notifications</h3>
             <p className="text-xs md:text-sm text-gray-400 font-medium max-w-[280px] mx-auto leading-relaxed">
-              No active system alerts detected. Your environment is currently secured.
+              You have no new notifications.
             </p>
           </div>
         ) : (
@@ -179,24 +217,28 @@ export function Notifications() {
               <table className="w-full text-left border-collapse min-w-[1000px]">
                 <thead>
                   <tr className="bg-white">
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Intelligence Details</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 w-40">Sync Status</th>
-                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 w-48">Timestamp</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">Notification</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 w-40">Status</th>
+                    <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 w-48">Date & Time</th>
                     <th className="px-8 py-5 text-right border-b border-gray-50 w-32 text-[10px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50/50">
                   <AnimatePresence mode="popLayout">
-                    {notifications
-                      .filter(n => {
-                        const matchesSearch = n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                          n.message.toLowerCase().includes(searchTerm.toLowerCase());
-                        const matchesStatus = statusFilter === 'All Status' ||
-                          (statusFilter === 'Acknowledged' && n.read) ||
-                          (statusFilter === 'Pending Sync' && !n.read);
-                        return matchesSearch && matchesStatus;
-                      })
-                      .map((notif) => (
+                    {filteredNotifications.length === 0 ? (
+                      <tr>
+                        <td colSpan={4}>
+                          <div className="py-12 flex flex-col items-center justify-center text-center">
+                            <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+                              <Bell className="w-8 h-8 text-gray-300" />
+                            </div>
+                            <h3 className="text-sm font-black text-navy uppercase tracking-tight mb-1">No Notifications Found</h3>
+                            <p className="text-xs text-gray-400 font-medium">Try adjusting your filters or search criteria.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredNotifications.map((notif) => (
                         <motion.tr
                           key={notif.id}
                           layout
@@ -255,6 +297,7 @@ export function Notifications() {
                                 </button>
                               )}
                               <button
+                                onClick={() => confirmDelete(notif)}
                                 className="p-2.5 bg-white hover:bg-gray-50 rounded-xl text-gray-400 hover:text-danger transition-all shadow-sm border border-gray-100"
                               >
                                 <Trash2 className="w-4 h-4" />
@@ -262,25 +305,26 @@ export function Notifications() {
                             </div>
                           </td>
                         </motion.tr>
-                      ))}
+                      ))
+                    )}
                   </AnimatePresence>
                 </tbody>
               </table>
             </div>
 
             {/* Mobile Card View */}
-            <div className="md:hidden divide-y divide-gray-50">
+            <div className="md:hidden space-y-4">
               <AnimatePresence mode="popLayout">
-                {notifications
-                  .filter(n => {
-                    const matchesSearch = n.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                      n.message.toLowerCase().includes(searchTerm.toLowerCase());
-                    const matchesStatus = statusFilter === 'All Status' ||
-                      (statusFilter === 'Acknowledged' && n.read) ||
-                      (statusFilter === 'Pending Sync' && !n.read);
-                    return matchesSearch && matchesStatus;
-                  })
-                  .map((notif) => (
+                {filteredNotifications.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-gray-100">
+                    <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mb-4">
+                      <Bell className="w-8 h-8 text-gray-300" />
+                    </div>
+                    <h3 className="text-sm font-black text-navy uppercase tracking-tight mb-1">No Intelligence Found</h3>
+                    <p className="text-xs text-gray-400 font-medium">Try adjusting your filters.</p>
+                  </div>
+                ) : (
+                  filteredNotifications.map((notif) => (
                     <motion.div
                       key={notif.id}
                       layout
@@ -319,6 +363,12 @@ export function Notifications() {
                           )}>
                             {notif.read ? "Acknowledged" : "Pending Sync"}
                           </div>
+                          <button 
+                            onClick={() => confirmDelete(notif)}
+                            className="p-3 rounded-xl bg-gray-50 text-gray-400 hover:text-danger hover:bg-danger/10 transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                           <div className="flex items-center gap-1.5 text-[9px] font-black text-gray-400 uppercase tracking-wider">
                             <Clock className="w-3 h-3" />
                             <span className="whitespace-nowrap">{notif.timestamp}</span>
@@ -351,7 +401,8 @@ export function Notifications() {
                         </div>
                       </div>
                     </motion.div>
-                  ))}
+                  ))
+                )}
               </AnimatePresence>
             </div>
           </>
@@ -359,10 +410,10 @@ export function Notifications() {
       </div>
 
       {/* Pagination Footer */}
-      {pagination && pagination.total_pages > 1 && (
+      {filteredNotifications.length > 0 && pagination && pagination.total_pages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 md:p-8 bg-gray-50/50 rounded-[32px] border border-gray-100">
           <p className="text-[9px] md:text-[10px] font-black text-gray-400 uppercase tracking-wider md:tracking-widest text-center sm:text-left">
-            Showing Intelligence <span className="text-navy">{notifications.length}</span> of <span className="text-navy">{pagination.total_items}</span>
+            Showing Notifications <span className="text-navy">{filteredNotifications.length}</span> of <span className="text-navy">{pagination.total_items}</span>
           </p>
 
           <div className="flex items-center gap-2 md:gap-3">
@@ -421,8 +472,8 @@ export function Notifications() {
             >
               <div className="flex items-center justify-between mb-6 md:mb-8">
                 <div className="space-y-1">
-                  <h2 className="text-xl md:text-2xl font-black text-navy tracking-tight uppercase">Broadcast Protocol</h2>
-                  <p className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-[0.15em] md:tracking-[0.2em]">Transmission of system-wide intelligence</p>
+                  <h2 className="text-xl md:text-2xl font-black text-navy tracking-tight uppercase">Broadcast Notification</h2>
+                  <p className="text-[9px] md:text-[10px] text-gray-400 font-black uppercase tracking-[0.15em] md:tracking-[0.2em]">Send a message to all users</p>
                 </div>
                 <button
                   onClick={() => setShowBroadcastModal(false)}
@@ -435,7 +486,7 @@ export function Notifications() {
               <form onSubmit={handleSendBroadcast} className="space-y-5 md:space-y-6">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6">
                   <div>
-                    <label className="block text-xs md:text-sm font-black text-navy uppercase tracking-wider md:tracking-widest mb-2 md:mb-3">Broadcast Target *</label>
+                    <label className="block text-xs md:text-sm font-black text-navy uppercase tracking-wider md:tracking-widest mb-2 md:mb-3">Send To *</label>
                     <div className="flex p-1 md:p-1.5 bg-gray-100 rounded-xl md:rounded-2xl">
                       <button
                         type="button"
@@ -461,7 +512,7 @@ export function Notifications() {
                   </div>
 
                   <div>
-                    <label className="block text-xs md:text-sm font-black text-navy uppercase tracking-wider md:tracking-widest mb-2 md:mb-3">Priority Level *</label>
+                    <label className="block text-xs md:text-sm font-black text-navy uppercase tracking-wider md:tracking-widest mb-2 md:mb-3">Type *</label>
                     <select
                       value={broadcastForm.type}
                       onChange={(e) => setBroadcastForm({ ...broadcastForm, type: e.target.value })}
@@ -557,6 +608,55 @@ export function Notifications() {
                   </button>
                 </div>
               </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={() => setShowDeleteModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[24px] p-6 max-w-sm w-full shadow-2xl relative overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="absolute top-0 right-0 w-32 h-32 bg-danger/10 rounded-full blur-3xl -mr-16 -mt-16" />
+              
+              <div className="relative z-10">
+                <div className="w-12 h-12 rounded-xl bg-danger/10 flex items-center justify-center mb-4">
+                  <Trash2 className="w-6 h-6 text-danger" />
+                </div>
+                
+                <h3 className="text-xl font-black text-navy uppercase tracking-tight mb-2">Confirm Delete</h3>
+                <p className="text-sm text-gray-500 font-medium leading-relaxed mb-6">
+                  Are you sure you want to permanently delete this notification? This action cannot be undone.
+                </p>
+
+                <div className="flex gap-3">
+                  <button
+                    onClick={() => setShowDeleteModal(false)}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-500 bg-gray-50 hover:bg-gray-100 transition-colors"
+                  >
+                    CANCEL
+                  </button>
+                  <button
+                    onClick={handleDeleteNotification}
+                    className="flex-1 py-3 px-4 rounded-xl font-bold text-white bg-danger hover:bg-danger/90 transition-colors shadow-lg shadow-danger/20"
+                  >
+                    DELETE
+                  </button>
+                </div>
+              </div>
             </motion.div>
           </motion.div>
         )}
