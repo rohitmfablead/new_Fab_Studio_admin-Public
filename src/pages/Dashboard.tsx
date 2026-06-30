@@ -52,36 +52,52 @@ const handleLogout = () => {
 
 // Build KPIs from API data
 const overview = dashboard?.overview;
+const summaryRaw = (dashboard as any)?._summary;
+
+const formatGrowth = (growth?: number) => {
+  if (growth === undefined || growth === null) return '+0%';
+  const sign = growth >= 0 ? '+' : '';
+  return `${sign}${growth}%`;
+};
+
 const currentKPIs = [
   {
     label: 'Total Users',
     value: overview ? overview.total_users.toLocaleString() : '—',
-    change: '+12.5%',
-    isUp: true,
+    change: formatGrowth(summaryRaw?.totalUsers?.growth),
+    isUp: summaryRaw?.totalUsers?.isPositive !== false,
     icon: Users,
     link: '/admin/users',
   },
   {
     label: 'Active Groups',
     value: overview ? overview.total_groups.toLocaleString() : '—',
-    change: '+5.2%',
-    isUp: true,
+    change: formatGrowth(summaryRaw?.activeGroups?.growth),
+    isUp: summaryRaw?.activeGroups?.isPositive !== false,
     icon: Users2,
     link: '/admin/groups',
   },
   {
     label: 'Total Photos',
     value: overview ? (overview.total_photos >= 1000000 ? `${(overview.total_photos / 1000000).toFixed(1)}M` : overview.total_photos.toLocaleString()) : '—',
-    change: '+18.4%',
-    isUp: true,
+    change: formatGrowth(summaryRaw?.totalPhotos?.growth),
+    isUp: summaryRaw?.totalPhotos?.isPositive !== false,
     icon: Images,
     link: '/admin/groups',
   },
   {
+    label: 'Revenue',
+    value: overview ? `₹${overview.revenue.toLocaleString()}` : '—',
+    change: formatGrowth(summaryRaw?.revenue?.growth),
+    isUp: summaryRaw?.revenue?.isPositive !== false,
+    icon: IndianRupee,
+    link: '/admin/transactions',
+  },
+  {
     label: 'Storage Used',
     value: overview?.storageUsed ?? '—',
-    change: '-2.4%',
-    isUp: false,
+    change: formatGrowth(summaryRaw?.storageUsed?.growth),
+    isUp: summaryRaw?.storageUsed?.isPositive !== false,
     icon: HardDrive,
     link: '/admin/settings',
   },
@@ -106,22 +122,39 @@ const currentStorage = dashboard?.storageDistribution?.length
       { name: 'System', value: 0, color: 'hsl(210, 80%, 55%)' },
     ];
 
-// Activity feed from API recentActivity
+// Activity feed from API recentActivity — clean up naming
 const recentActivity = dashboard?.recentActivity || [];
+
+const cleanActivityTitle = (title: string, type: string) => {
+  if (title === 'New Collective Created') return 'New Group Created';
+  return title;
+};
+
+const cleanActivityDescription = (desc: string, type: string) => {
+  if (!desc || desc.trim() === '' || desc.trim() === 'joined the platform') {
+    return type === 'user' ? 'A new user joined the platform' : 'A new group was created';
+  }
+  return desc
+    .replace('was initialized', 'was created')
+    .replace('Collective', 'Group');
+};
+
 const currentActivities = recentActivity.slice(0, 5).map((a, i) => ({
   id: i + 1,
-  event: a.title,
-  user: a.description,
+  event: cleanActivityTitle(a.title, a.type),
+  user: cleanActivityDescription(a.description, a.type),
   time: a.time,
-  status: a.type === 'user' ? 'Success' : 'Success',
+  type: a.type,
+  status: a.type === 'user' ? 'User' : 'Group',
 }));
 
 const allActivitiesData = recentActivity.map((a, i) => ({
   id: i + 1,
-  event: a.title,
-  user: a.description,
+  event: cleanActivityTitle(a.title, a.type),
+  user: cleanActivityDescription(a.description, a.type),
   time: a.time,
-  status: 'Success',
+  type: a.type,
+  status: a.type === 'user' ? 'User' : 'Group',
 }));
 
   return (
@@ -141,7 +174,7 @@ const allActivitiesData = recentActivity.map((a, i) => ({
       </div>
 
       {/* KPI Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6">
         {currentKPIs.map((kpi, index) => (
           <motion.div
             key={kpi.label}
@@ -304,8 +337,11 @@ const allActivitiesData = recentActivity.map((a, i) => ({
                   onClick={() => navigate(recentActivity[i]?.type === 'user' ? '/admin/users' : '/admin/groups')}
                   className="flex items-start md:items-center gap-3 md:gap-4 group cursor-pointer"
                 >
-                  <div className="w-10 h-10 shrink-0 rounded-full bg-gray-100 flex items-center justify-center font-bold text-gray-500 overflow-hidden group-hover:ring-2 group-hover:ring-primary/20 transition-all">
-                    {activity.user.charAt(0) || '?'}
+                  <div className={cn(
+                    "w-10 h-10 shrink-0 rounded-full flex items-center justify-center font-bold overflow-hidden group-hover:ring-2 group-hover:ring-primary/20 transition-all",
+                    activity.type === 'user' ? 'bg-blue-50 text-blue-600' : 'bg-primary/10 text-primary'
+                  )}>
+                    {activity.type === 'user' ? 'U' : 'G'}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm truncate">
@@ -316,7 +352,7 @@ const allActivitiesData = recentActivity.map((a, i) => ({
                   </div>
                   <div className={cn(
                     "px-2 py-0.5 rounded text-[8px] font-black uppercase shrink-0",
-                    activity.status === 'Success' ? 'bg-success/10 text-success' : 'bg-primary/10 text-primary'
+                    activity.type === 'user' ? 'bg-blue-50 text-blue-600' : 'bg-primary/10 text-primary'
                   )}>
                     {activity.status}
                   </div>
@@ -386,8 +422,11 @@ const allActivitiesData = recentActivity.map((a, i) => ({
                 <div className="space-y-4">
                   {allActivitiesData.map((activity) => (
                     <div key={activity.id} className="flex items-center gap-3 md:gap-4 p-3 md:p-4 rounded-2xl hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all group">
-                      <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-2xl bg-gray-100 flex items-center justify-center font-black text-gray-500 text-base md:text-lg group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-                        {activity.user.charAt(0)}
+                      <div className={cn(
+                        "w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-2xl flex items-center justify-center font-black text-base md:text-lg transition-colors",
+                        activity.type === 'user' ? 'bg-blue-50 text-blue-600 group-hover:bg-blue-100' : 'bg-primary/10 text-primary group-hover:bg-primary/20'
+                      )}>
+                        {activity.type === 'user' ? 'U' : 'G'}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1">

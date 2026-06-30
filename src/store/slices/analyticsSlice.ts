@@ -59,6 +59,7 @@ export interface DashboardAnalytics {
   storageDistribution?: StorageDistribution[];
   systemHealth?: Record<string, SystemHealthItem>;
   recentActivity?: RecentActivityItem[];
+  _summary?: any;
 }
 
 export interface UserAnalytics {
@@ -180,6 +181,7 @@ export const fetchDashboardAnalytics = createAsyncThunk(
           storageDistribution: d.storageDistribution || [],
           systemHealth: d.systemHealth || {},
           recentActivity: d.recentActivity || [],
+          _summary: d.summary,
         };
 
         return mapped;
