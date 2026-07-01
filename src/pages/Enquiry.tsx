@@ -159,29 +159,31 @@ export function EnquiryPage() {
 
         if (!isMounted) return;
 
-        if (response.success) {
-          const apiData = response.data;
+        if (response.success || (response as any).data) {
+          const dataObj = response.data || (response as any);
+          const apiData = dataObj.data || dataObj;
+          
           const messages = Array.isArray(apiData)
             ? apiData
-            : Array.isArray(apiData?.contact_messages)
-              ? apiData.contact_messages
-              : Array.isArray(apiData?.messages)
-                ? apiData.messages
-                : Array.isArray(apiData?.items)
-                  ? apiData.items
+            : Array.isArray(dataObj?.contact_messages)
+              ? dataObj.contact_messages
+              : Array.isArray(dataObj?.messages)
+                ? dataObj.messages
+                : Array.isArray(dataObj?.items)
+                  ? dataObj.items
                   : Array.isArray(apiData?.data)
                     ? apiData.data
                     : [];
 
-          const paginationSource = apiData?.pagination || apiData?.meta || null;
+          const paginationSource = (response as any).meta || (response as any).pagination || dataObj?.pagination || dataObj?.meta || null;
 
           setContactMessages(messages);
           setContactPagination(
             paginationSource
               ? {
-                current_page: paginationSource.current_page || contactCurrentPage,
-                total_pages: paginationSource.total_pages || 1,
-                total_items: paginationSource.total_items ?? messages.length,
+                current_page: paginationSource.current_page || paginationSource.current || contactCurrentPage,
+                total_pages: paginationSource.total_pages || paginationSource.last_page || 1,
+                total_items: paginationSource.total_items ?? paginationSource.total ?? messages.length,
                 per_page: paginationSource.per_page || contactPageSize,
               }
               : {

@@ -81,10 +81,19 @@ export const fetchEnquiries = createAsyncThunk(
 
       const response = await get<any>(`/admin/inquiries${queryParams.toString() ? '?' + queryParams.toString() : ''}`);
       
-      if (response.success) {
+      if (response.success || (response as any).data) {
+        const dataObj = response.data || (response as any);
+        const enquiries = dataObj.data || dataObj || [];
+        const pagination = (response as any).meta || (response as any).pagination || dataObj.meta || dataObj.pagination || null;
+        
         return {
-          enquiries: response.data || [],
-          pagination: (response as any).pagination || null,
+          enquiries: Array.isArray(enquiries) ? enquiries : [],
+          pagination: pagination ? {
+            current_page: pagination.current_page ?? pagination.page ?? 1,
+            total_pages: pagination.last_page ?? pagination.totalPages ?? pagination.total_pages ?? 1,
+            total_items: pagination.total ?? pagination.total_items ?? (Array.isArray(enquiries) ? enquiries.length : 0),
+            per_page: pagination.per_page ?? pagination.limit ?? params.limit ?? 20
+          } : null,
         };
       } else {
         return rejectWithValue(response.error?.message || 'Failed to fetch enquiries');

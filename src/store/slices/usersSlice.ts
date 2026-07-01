@@ -115,17 +115,21 @@ export const fetchUsers = createAsyncThunk(
   async (params: UsersQueryParams = {}, { rejectWithValue }) => {
     try {
       const response = await get<any>('/admin/users', params);
-      if (response.success) {
-        const users = response.data || [];
-        const pagination = (response as any).pagination || {};
+      if (response.success || (response as any).data) {
+        // Handle both standard wrapped { success: true, data: [...] }
+        // and Laravel Resource format { data: [...], meta: {...} }
+        const dataObj = response.data || (response as any);
+        const users = dataObj.data || dataObj || [];
+        const pagination = (response as any).meta || (response as any).pagination || dataObj.meta || dataObj.pagination || {};
+        
         return {
           users: Array.isArray(users) ? users : [],
           pagination: {
-            current_page: pagination.page ?? 1,
-            total_pages: pagination.totalPages ?? 1,
-            total_items: pagination.total ?? users.length,
-            total_users: pagination.total ?? users.length,
-            per_page: pagination.limit ?? 20,
+            current_page: pagination.current_page ?? pagination.page ?? 1,
+            total_pages: pagination.last_page ?? pagination.totalPages ?? pagination.total_pages ?? 1,
+            total_items: pagination.total ?? pagination.total_items ?? (Array.isArray(users) ? users.length : 0),
+            total_users: pagination.total ?? pagination.total_users ?? pagination.total_items ?? (Array.isArray(users) ? users.length : 0),
+            limit: pagination.per_page ?? pagination.limit ?? params.limit ?? 20
           },
         };
       } else {
