@@ -16,6 +16,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const { unreadCount } = useAppSelector((state) => state.notifications);
   const pathnames = location.pathname.split('/').filter((x) => x);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [imageError, setImageError] = useState(false);
   const [isChangePwOpen, setIsChangePwOpen] = useState(false);
   const [pwForm, setPwForm] = useState({
     current_password: '',
@@ -124,6 +125,7 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
   const email = settings?.profile?.email || 'admin@fabphotopic.com';
   const title = settings?.profile?.professional_title || 'SUPER ADMIN';
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+  const avatarUrl = settings?.profile?.avatar;
 
   return (
     <>
@@ -198,8 +200,8 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
               )}
             >
               <div className="relative">
-                {settings?.profile?.avatar ? (
-                  <img src={settings.profile.avatar} className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm" alt="Avatar" />
+                {(!imageError && avatarUrl) ? (
+                  <img src={avatarUrl} onError={() => setImageError(true)} className="w-8 h-8 rounded-full object-cover ring-2 ring-white shadow-sm" alt="Avatar" />
                 ) : (
                   <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center text-white font-bold text-xs ring-2 ring-white shadow-sm">
                     {initials}
@@ -228,10 +230,10 @@ export function Header({ onMenuClick }: { onMenuClick?: () => void }) {
                     <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-primary/20 blur-[40px] rounded-full" />
                     <div className="relative z-10 flex items-center gap-4">
                       <div className="w-14 h-14 rounded-2xl bg-white/10 border border-white/10 backdrop-blur-md flex items-center justify-center p-0.5">
-                        {settings?.profile?.avatar ? (
-                          <img src={settings.profile.avatar} className="w-full h-full rounded-xl object-cover" alt="Avatar" />
+                        {(!imageError && avatarUrl) ? (
+                          <img src={avatarUrl} onError={() => setImageError(true)} className="w-full h-full rounded-[14px] object-cover" alt="Profile" />
                         ) : (
-                          <div className="w-full h-full rounded-xl bg-primary flex items-center justify-center text-white text-xl font-black">
+                          <div className="w-full h-full rounded-[14px] bg-gradient-to-tr from-primary to-orange-400 flex items-center justify-center text-white font-bold text-xl shadow-inner">
                             {initials}
                           </div>
                         )}

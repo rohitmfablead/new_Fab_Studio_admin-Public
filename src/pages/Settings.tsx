@@ -757,21 +757,6 @@ export function SettingsPage() {
                                 </div>
                               )}
                             </div>
-                            <label 
-                              className={cn(
-                                "absolute -bottom-1.5 -right-1.5 p-2 bg-primary text-white rounded-lg shadow-lg border-2 border-navy transition-transform cursor-pointer z-20",
-                                (isSavingProfile || isUpdating) ? "opacity-50 cursor-not-allowed" : "hover:scale-110"
-                              )}
-                            >
-                              <Camera className="w-3 h-3" />
-                              <input
-                                type="file"
-                                accept="image/jpeg, image/png, image/webp"
-                                className="hidden"
-                                onChange={handleAvatarChange}
-                                disabled={isSavingProfile || isUpdating}
-                              />
-                            </label>
                           </div>
                           <div>
                             <h3 className="text-4xl font-black text-white tracking-tight">
